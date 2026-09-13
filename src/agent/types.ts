@@ -30,6 +30,7 @@ export type ProviderEvent =
   | { type: 'text'; text: string }
   | { type: 'tool'; call: ToolCall }
   | { type: 'status'; message: string }
+  | { type: 'incomplete'; reason: 'length' }
   | { type: 'usage'; input: number; output: number; costUsd?: number };
 export interface Provider {
   models(signal?: AbortSignal): Promise<Model[]>;

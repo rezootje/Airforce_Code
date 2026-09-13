@@ -229,6 +229,7 @@ export class AirforceProvider implements Provider {
         })();
     const calls = new Map<number, ToolCall>();
     let finished = false;
+    let incomplete = false;
     let announcedTool = false;
     for await (const raw of events) {
       const chunk = chunkSchema.parse(raw);
@@ -238,9 +239,10 @@ export class AirforceProvider implements Provider {
       const delta = choice?.delta ?? choice?.message;
       if (choice?.finish_reason) {
         finished = true;
-        if (['length', 'content_filter'].includes(choice.finish_reason))
+        if (choice.finish_reason === 'length') incomplete = true;
+        if (choice.finish_reason === 'content_filter')
           throw new AirforceError(
-            `Model stopped: ${choice.finish_reason}. Increase output budget or revise request.`,
+            'Model response was stopped by the provider content filter.',
             'INCOMPLETE',
           );
       }
@@ -276,6 +278,11 @@ export class AirforceProvider implements Provider {
         'Completion stream ended before a finish marker. No tools executed.',
         'INCOMPLETE',
       );
+    if (incomplete) {
+      // Tool arguments may be partial when the output cap is reached. Never execute them.
+      yield { type: 'incomplete', reason: 'length' };
+      return;
+    }
     const ids = new Set<string>();
     for (const call of calls.values()) {
       if (!call.id || !call.name || ids.has(call.id))
@@ -335,6 +342,7 @@ export class AirforceProvider implements Provider {
     );
     const calls = new Map<number, ToolCall>();
     let finished = false;
+    let incomplete = false;
     let input = 0;
     let announcedTool = false;
     for await (const raw of sse(response, { signal })) {
@@ -342,8 +350,7 @@ export class AirforceProvider implements Provider {
       if (event.type === 'error')
         throw new AirforceError('Anthropic stream reported an error', 'PROTOCOL');
       if (event.type === 'message_stop') finished = true;
-      if (event.delta?.stop_reason === 'max_tokens')
-        throw new AirforceError('Model exhausted output budget', 'INCOMPLETE');
+      if (event.delta?.stop_reason === 'max_tokens') incomplete = true;
       if (event.type === 'message_start') input = event.message?.usage?.input_tokens ?? 0;
       if (event.usage) {
         const inputTokens = input || event.usage.input_tokens || 0;
@@ -378,6 +385,11 @@ export class AirforceProvider implements Provider {
       }
     }
     if (!finished) throw new AirforceError('Anthropic stream ended prematurely', 'INCOMPLETE');
+    if (incomplete) {
+      // A content block may contain incomplete JSON. Do not expose it as an executable tool call.
+      yield { type: 'incomplete', reason: 'length' };
+      return;
+    }
     const ids = new Set<string>();
     for (const call of calls.values()) {
       if (!call.id || !call.name || ids.has(call.id))

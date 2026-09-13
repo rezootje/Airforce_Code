@@ -126,6 +126,37 @@ it('rejects truncated streams and malformed response JSON', async () => {
   vi.stubGlobal('fetch', async () => new Response('data: {bad}\n\n'));
   await expect(collect(new AirforceProvider(cfg(), 'key'))).rejects.toThrow('Malformed SSE');
 });
+it('reports output limits without executing a truncated OpenAI tool call', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      stream([
+        {
+          choices: [
+            {
+              delta: {
+                content: 'Continuing the implementation.\n',
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: 'partial',
+                    function: { name: 'write_file', arguments: '{"path":"game.js","cont' },
+                  },
+                ],
+              },
+              finish_reason: 'length',
+            },
+          ],
+          usage: { prompt_tokens: 20, completion_tokens: 4096 },
+        },
+      ]),
+    ),
+  );
+  const events = await collect(new AirforceProvider(cfg(), 'key'));
+  expect(events).toContainEqual({ type: 'text', text: 'Continuing the implementation.\n' });
+  expect(events).toContainEqual({ type: 'incomplete', reason: 'length' });
+  expect(events.some((event) => event.type === 'tool')).toBe(false);
+});
 it('handles non-streaming models and standard non-stream tool indices', async () => {
   const fetchMock = vi.fn(
     async (_url: string, _init: RequestInit) =>
@@ -180,6 +211,32 @@ it('normalizes Anthropic streaming tool calls and messages', async () => {
   });
   expect(result).toContainEqual({ type: 'usage', input: 20, output: 10 });
   expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.test/v1/messages');
+});
+it('reports Anthropic max_tokens without executing partial tool JSON', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      stream([
+        { type: 'message_start', message: { usage: { input_tokens: 20 } } },
+        {
+          type: 'content_block_start',
+          index: 0,
+          content_block: { type: 'tool_use', id: 'partial', name: 'write_file', input: {} },
+        },
+        {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'input_json_delta', partial_json: '{"path":"game.js"' },
+        },
+        { type: 'message_delta', delta: { stop_reason: 'max_tokens' } },
+        { type: 'message_stop' },
+      ]),
+    ),
+  );
+  expect(await collect(new AirforceProvider(cfg('anthropic'), 'key'))).toContainEqual({
+    type: 'incomplete',
+    reason: 'length',
+  });
 });
 it('does not leak raw HTTP error bodies or retry authentication failure', async () => {
   const mock = vi.fn(async () => new Response('private upstream diagnostic', { status: 401 }));

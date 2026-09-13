@@ -69,6 +69,7 @@ export class Agent {
         const calls: ToolCall[] = [];
         let text = '';
         let received = 0;
+        let incomplete = false;
         o.emit({ type: 'agent.progress', message: `Waiting for model · step ${step + 1}` });
         for await (const event of o.provider.complete(
           o.redactor.value(messages),
@@ -89,6 +90,8 @@ export class Agent {
             calls.push(event.call);
           } else if (event.type === 'status') {
             o.emit({ type: 'agent.progress', message: event.message });
+          } else if (event.type === 'incomplete') {
+            incomplete = true;
           } else {
             o.session.usage.inputTokens += event.input;
             o.session.usage.outputTokens += event.output;
@@ -137,6 +140,19 @@ export class Agent {
         o.session.messages.push(message);
         await o.store.save(o.session);
         if (final) o.emit({ type: 'assistant.message', text: sanitize(final) });
+        if (incomplete) {
+          o.emit({
+            type: 'warning',
+            message: 'Model reached its output limit; continuing automatically with smaller steps.',
+          });
+          o.session.messages.push({
+            role: 'user',
+            content:
+              '[Airforce continuation] The previous response reached its output-token limit. Continue the current task from the last completed action. Do not repeat successful tool calls already present in the history. A pending tool call may have been truncated and was not executed; replace it with smaller valid tool calls. Keep each file edit compact, and verify the completed work.',
+          });
+          await o.store.save(o.session);
+          continue;
+        }
         if (!calls.length) {
           o.emit({ type: 'agent.completed', status: 'completed', text: sanitize(final) });
           return { status: 'completed', text: final };

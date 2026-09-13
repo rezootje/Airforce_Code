@@ -79,6 +79,60 @@ it('completes a multi-step inspect, patch, verify loop and persists tool results
     await w.cleanup();
   }
 });
+it('continues automatically after the model reaches its output limit', async () => {
+  const w = await workspace();
+  try {
+    const events: AgentEvent[] = [];
+    const provider = new FakeProvider([
+      () => [
+        {
+          type: 'tool',
+          call: {
+            id: 'first-file',
+            name: 'write_file',
+            arguments: '{"path":"index.html","content":"<main>Game</main>","expectedHash":null}',
+          },
+        },
+      ],
+      () => [{ type: 'incomplete', reason: 'length' }],
+      (messages) => {
+        expect(messages.at(-1)?.content).toContain('replace it with smaller valid tool calls');
+        return [
+          {
+            type: 'tool',
+            call: {
+              id: 'second-file',
+              name: 'write_file',
+              arguments: '{"path":"game.js","content":"const ready = true;","expectedHash":null}',
+            },
+          },
+        ];
+      },
+      () => [{ type: 'text', text: 'Created and verified the game files.' }],
+    ]);
+    const session = newSession(w.root);
+    const runtime = await createRuntime(
+      configSchema.parse({ permissionMode: 'edit' }),
+      w.home,
+      session,
+      provider,
+      async () => false,
+      (event) => events.push(event),
+      new Redactor(),
+    );
+    const result = await runtime.agent.run('Build a game', new AbortController().signal);
+    expect(result).toMatchObject({ status: 'completed' });
+    expect(await readFile(join(w.root, 'index.html'), 'utf8')).toContain('Game');
+    expect(await readFile(join(w.root, 'game.js'), 'utf8')).toContain('ready');
+    expect(events).toContainEqual({
+      type: 'warning',
+      message: 'Model reached its output limit; continuing automatically with smaller steps.',
+    });
+    expect(provider.requests).toHaveLength(4);
+  } finally {
+    await w.cleanup();
+  }
+});
 it('refuses stale edits and undo conflicts, supports undo and redo', async () => {
   const w = await workspace();
   try {

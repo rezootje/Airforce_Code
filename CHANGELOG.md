@@ -2,6 +2,12 @@
 
 All user-visible changes are documented here. Versions follow Semantic Versioning.
 
+## [1.1.4] - 2026-09-13
+
+- Continue multi-step tasks automatically when a model reaches its output-token limit.
+- Discard truncated tool calls instead of executing incomplete arguments, then ask the model to resume with smaller focused edits.
+- Apply the same output-limit recovery to OpenAI-compatible and Anthropic-compatible streams.
+
 ## [1.1.3] - 2026-09-13
 
 - Keep completed first-run onboarding completed across launches; missing or expired credentials now open the focused authentication flow instead of restarting setup.

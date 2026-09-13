@@ -60,8 +60,14 @@ export class ContextManager {
         },
       ];
       let next = '';
-      for await (const event of provider.complete(prompt, [], signal))
+      for await (const event of provider.complete(prompt, [], signal)) {
         if (event.type === 'text') next += event.text;
+        if (event.type === 'incomplete')
+          throw new AirforceError(
+            'Compaction reached the model output limit; history retained.',
+            'CONTEXT',
+          );
+      }
       if (!next.trim() || next.length > 12000)
         throw new AirforceError(
           'Compaction returned an empty or oversized summary; history retained.',
