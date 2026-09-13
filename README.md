@@ -2,11 +2,11 @@
 
 A permission-aware coding agent for your terminal, powered by a configurable **api.airforce** endpoint. Airforce searches repositories, reads files, applies checked patches, runs approved commands, inspects Git, and resumes multi-step engineering sessions.
 
-**Status: initial implementation, version 0.1.0.** The local vertical slice and security/integration tests work against fake providers. This repository has not been published to NPM or validated against a real api.airforce account. See [release scope and remaining gates](docs/STATUS.md) before treating it as a production release.
-
 ## Install and run
 
-Requires Node.js 24 or newer. Linux, macOS and Windows CI are configured; local validation was performed on Linux.
+Requires Node.js 24 or newer. 
+**WARNING:** The application was originally tested on Linux (Fedora), we do NOT know if Windows and MacOS work just yet. 
+Please be aware of this when installing Airforce Code. We recommend WSL on Windows if it doesn't work.
 
 After publication under the selected package name:
 
@@ -16,25 +16,6 @@ npm install -g airforce-code
 npx airforce-code
 ```
 
-To run this checkout now:
-
-```sh
-npm ci
-npm run build
-node dist/cli/main.js setup
-node dist/cli/main.js
-# Development
-npm run dev -- --help
-```
-
-To test the actual installation path before publication:
-
-```sh
-npm run test:package
-# Or install a locally generated tarball
-npm pack
-npm install -g ./airforce-code-0.1.0.tgz
-```
 
 The NPM package is `airforce-code`. Installation provides both `airforce` and `airforce-code` executable names; documentation uses the shorter `airforce` command. The package name remains centralized in `package.json`, and package verification reads it dynamically.
 
