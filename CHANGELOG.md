@@ -7,7 +7,7 @@ All user-visible changes are documented here. Versions follow Semantic Versionin
 - Keep completed first-run onboarding completed across launches; missing or expired credentials now open the focused authentication flow instead of restarting setup.
 - Let interactive launches recover a missing model through the model picker without repeating onboarding.
 - Make temporary-workspace tests compare canonical paths on macOS and Windows so the full CI matrix validates the same security behavior.
-- Update official GitHub Actions to their Node 24-based releases and apply POSIX permission-bit assertions only on POSIX systems.
+- Update official GitHub Actions to their Node 24-based releases, normalize text files to LF across platforms, and apply POSIX permission-bit assertions only on POSIX systems.
 
 ## [1.1.2] - 2026-09-13
 
