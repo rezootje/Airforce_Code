@@ -36,6 +36,8 @@ export class Agent {
     let final = '';
     let streamed = 0;
     try {
+      o.emit({ type: 'agent.started', sessionId: o.session.id });
+      o.emit({ type: 'agent.progress', message: 'Opening session' });
       release = await o.store.lock(o.session.id);
       repairInterruptedTools(o.session.messages);
       const safe = o.redactor.text(prompt);
@@ -44,9 +46,12 @@ export class Agent {
       if (o.session.title === 'New session') o.session.title = sanitize(safe).slice(0, 80);
       o.policy.questionFirst = o.session.questionFirst;
       await o.store.save(o.session);
-      o.emit({ type: 'agent.started', sessionId: o.session.id });
       for (let step = 0; step < o.maxTurns; step++) {
         signal.throwIfAborted();
+        o.emit({
+          type: 'agent.progress',
+          message: step === 0 ? 'Preparing context' : `Reviewing tool results · step ${step + 1}`,
+        });
         for (const instruction of this.steering.splice(0)) {
           o.session.requirements.push(instruction);
           o.session.messages.push({ role: 'user', content: instruction });
@@ -63,6 +68,8 @@ export class Agent {
         }
         const calls: ToolCall[] = [];
         let text = '';
+        let received = 0;
+        o.emit({ type: 'agent.progress', message: `Waiting for model · step ${step + 1}` });
         for await (const event of o.provider.complete(
           o.redactor.value(messages),
           o.registry.definitions(),
@@ -71,12 +78,17 @@ export class Agent {
           signal.throwIfAborted();
           if (event.type === 'text') {
             text += event.text;
+            received += event.text.length;
+            if (received === event.text.length || received % 256 < event.text.length)
+              o.emit({ type: 'agent.progress', message: 'Receiving response' });
             if (text.length > 2_000_000)
               throw new AirforceError('Assistant response exceeds limit', 'RESPONSE_LIMIT');
           } else if (event.type === 'tool') {
             if (calls.length >= 32)
               throw new AirforceError('Too many tool calls in one turn', 'TOOL_LIMIT');
             calls.push(event.call);
+          } else if (event.type === 'status') {
+            o.emit({ type: 'agent.progress', message: event.message });
           } else {
             o.session.usage.inputTokens += event.input;
             o.session.usage.outputTokens += event.output;
@@ -129,6 +141,10 @@ export class Agent {
           o.emit({ type: 'agent.completed', status: 'completed', text: sanitize(final) });
           return { status: 'completed', text: final };
         }
+        o.emit({
+          type: 'agent.progress',
+          message: `Running ${calls.length} tool${calls.length === 1 ? '' : 's'}`,
+        });
         for (const call of calls) {
           const result = await o.registry.execute(call, { signal, emit: o.emit });
           o.session.messages.push({ role: 'tool', toolCallId: call.id, content: result.content });

@@ -101,6 +101,7 @@ it('assembles streamed tool arguments and usage before executing anything', asyn
     ),
   ).toEqual([
     { type: 'text', text: 'Reading\n' },
+    { type: 'status', message: 'Preparing tool call' },
     { type: 'usage', input: 12, output: 8, costUsd: 0.000156 },
     { type: 'tool', call: { id: 'call-1', name: 'read_file', arguments: '{"path":"a"}' } },
   ]);
@@ -147,9 +148,9 @@ it('handles non-streaming models and standard non-stream tool indices', async ()
     id: 'discovered',
     capabilities: { streaming: false },
   });
-  expect((await collect(p))[0]).toMatchObject({
+  expect(await collect(p)).toContainEqual({
     type: 'tool',
-    call: { id: 'a', name: 'read_file' },
+    call: { id: 'a', name: 'read_file', arguments: '{}' },
   });
   expect(JSON.parse((fetchMock.mock.calls[0]?.[1]?.body as string) || '{}').stream).toBe(false);
 });
@@ -196,4 +197,14 @@ it('caches models and allows refresh', async () => {
   p.invalidateModels();
   await p.models();
   expect(mock).toHaveBeenCalledTimes(2);
+});
+
+it('fails a stalled response stream with an identifiable timeout', async () => {
+  const body = new ReadableStream<Uint8Array>({ start() {} });
+  const consume = async () => {
+    for await (const _event of sse(new Response(body), { idleTimeoutMs: 10 })) {
+      // A stalled stream never yields an event.
+    }
+  };
+  await expect(consume()).rejects.toMatchObject({ code: 'STREAM_TIMEOUT' });
 });

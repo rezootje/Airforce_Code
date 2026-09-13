@@ -18,8 +18,15 @@ export class Output {
   private readonly activity: ActivityIndicator;
   private readonly markdown?: MarkdownStream;
   private latestUsage?: Extract<AgentEvent, { type: 'usage' }>;
+  private shownToolOutput = 0;
+  private toolOutputTruncated = false;
   constructor(readonly options: OutputOptions) {
-    const interactive = !!process.stdout.isTTY && !options.json && !options.jsonl && !options.quiet;
+    const interactive =
+      !!process.stdout.isTTY &&
+      !!process.stderr.isTTY &&
+      !options.json &&
+      !options.jsonl &&
+      !options.quiet;
     const color = options.color !== false && !process.env.NO_COLOR && !!process.stdout.isTTY;
     this.colors = pc.createColors(color);
     const theme = createTheme(color);
@@ -28,6 +35,9 @@ export class Output {
   }
   idle(): void {
     this.activity.stop();
+  }
+  working(label: string): void {
+    this.activity.begin(label);
   }
   event = (event: AgentEvent): void => {
     event = this.redactor.value(event);
@@ -38,7 +48,13 @@ export class Output {
     if (this.options.json) return;
     if (event.type === 'agent.started') {
       this.markdown?.clear();
+      this.shownToolOutput = 0;
+      this.toolOutputTruncated = false;
       this.activity.begin('Working');
+      return;
+    }
+    if (event.type === 'agent.progress') {
+      this.activity.update(sanitize(event.message));
       return;
     }
     if (event.type === 'assistant.delta') {
@@ -99,7 +115,31 @@ export class Output {
       return;
     }
     if (this.options.quiet) return;
-    if (event.type === 'tool.started') {
+    if (event.type === 'tool.output') {
+      if (this.toolOutputTruncated) return;
+      const clean = sanitize(event.text);
+      const remaining = 16000 - this.shownToolOutput;
+      if (remaining <= 0) {
+        this.toolOutputTruncated = true;
+        this.activity.suspend();
+        process.stderr.write(this.colors.dim('  │ … live output hidden after 16 KB\n'));
+        this.activity.resume();
+        return;
+      }
+      const value = clean.slice(0, remaining);
+      this.shownToolOutput += value.length;
+      this.activity.suspend();
+      const prefix =
+        event.stream === 'stderr' ? this.colors.yellow('  │ ') : this.colors.dim('  │ ');
+      process.stderr.write(
+        value
+          .split(/(?<=\n)/)
+          .map((line) => (line ? prefix + line : ''))
+          .join(''),
+      );
+      if (clean.length > value.length) this.toolOutputTruncated = true;
+      this.activity.resume();
+    } else if (event.type === 'tool.started') {
       this.activity.suspend();
       if (this.streaming) {
         process.stdout.write('\n');

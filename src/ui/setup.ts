@@ -176,6 +176,7 @@ export async function setup(
   const method = await chooseAuthentication(options.method, defaultService);
   const credentials = await enterCredentials(config, method, options.browser);
   const provider = new AirforceProvider(config, credentials);
+  process.stderr.write(`  ${theme.muted('Connecting and loading models…')}\n`);
   const models = await provider.models();
   if (!models.length) throw new Error('The API returned no models. Check access for this API key.');
   process.stderr.write(
@@ -251,6 +252,7 @@ export async function updateAuthentication(
   const method = await chooseAuthentication(options.method, defaultService);
   const credentials = await enterCredentials(config, method, options.browser);
   const provider = new AirforceProvider(config, credentials);
+  process.stderr.write(`  ${theme.muted('Validating credentials and loading models…')}\n`);
   const models = await provider.models();
   if (!models.length) throw new Error('The API returned no models. Credentials were not changed.');
   const current = models.find((model) => model.id === config.model);

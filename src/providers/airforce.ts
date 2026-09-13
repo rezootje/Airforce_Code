@@ -181,7 +181,7 @@ export class AirforceProvider implements Provider {
       { headers: { authorization: `Bearer ${this.apiKey}` } },
       signal,
     );
-    const models = parseModels(JSON.parse(await boundedText(res)));
+    const models = parseModels(JSON.parse(await boundedText(res, 4_000_000, 30000, signal)));
     this.cache = { at: Date.now(), models };
     return models;
   }
@@ -191,7 +191,7 @@ export class AirforceProvider implements Provider {
     signal: AbortSignal,
   ): AsyncIterable<ProviderEvent> {
     if (!this.config.model) throw new AirforceError('Select a model first.', 'CONFIG', 2);
-    const effective = AbortSignal.any([signal, AbortSignal.timeout(180000)]);
+    const effective = AbortSignal.any([signal, AbortSignal.timeout(300000)]);
     const available = this.modelInfo?.capabilities.tools === false ? [] : tools;
     if (this.config.protocol === 'anthropic') {
       yield* this.anthropic(messages, available, effective);
@@ -223,12 +223,13 @@ export class AirforceProvider implements Provider {
       effective,
     );
     const events = streaming
-      ? sse(response)
+      ? sse(response, { signal: effective })
       : (async function* () {
-          yield JSON.parse(await boundedText(response));
+          yield JSON.parse(await boundedText(response, 4_000_000, 30000, effective));
         })();
     const calls = new Map<number, ToolCall>();
     let finished = false;
+    let announcedTool = false;
     for await (const raw of events) {
       const chunk = chunkSchema.parse(raw);
       if (chunk.error)
@@ -244,6 +245,10 @@ export class AirforceProvider implements Provider {
           );
       }
       if (delta?.content) yield { type: 'text', text: delta.content };
+      if (delta?.tool_calls?.length && !announcedTool) {
+        announcedTool = true;
+        yield { type: 'status', message: 'Preparing tool call' };
+      }
       for (const [position, part] of (delta?.tool_calls ?? []).entries()) {
         const index = part.index ?? position;
         const old = calls.get(index) ?? { id: '', name: '', arguments: '' };
@@ -331,7 +336,8 @@ export class AirforceProvider implements Provider {
     const calls = new Map<number, ToolCall>();
     let finished = false;
     let input = 0;
-    for await (const raw of sse(response)) {
+    let announcedTool = false;
+    for await (const raw of sse(response, { signal })) {
       const event = anthropicSchema.parse(raw);
       if (event.type === 'error')
         throw new AirforceError('Anthropic stream reported an error', 'PROTOCOL');
@@ -350,12 +356,17 @@ export class AirforceProvider implements Provider {
           ...(costUsd === undefined ? {} : { costUsd }),
         };
       }
-      if (event.content_block?.type === 'tool_use' && event.index !== undefined)
+      if (event.content_block?.type === 'tool_use' && event.index !== undefined) {
+        if (!announcedTool) {
+          announcedTool = true;
+          yield { type: 'status', message: 'Preparing tool call' };
+        }
         calls.set(event.index, {
           id: event.content_block.id ?? '',
           name: event.content_block.name ?? '',
           arguments: '',
         });
+      }
       if (event.content_block?.text) yield { type: 'text', text: event.content_block.text };
       if (event.delta?.text) yield { type: 'text', text: event.delta.text };
       if (event.delta?.partial_json && event.index !== undefined) {

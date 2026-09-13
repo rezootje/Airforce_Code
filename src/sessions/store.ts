@@ -6,6 +6,23 @@ import { atomicJson, privateDirectory, safeStorageFile } from '../utils/storage.
 import { AirforceError, isMissing } from '../utils/errors.js';
 import type { Message } from '../agent/types.js';
 import { Redactor } from '../security/redact.js';
+
+async function staleProcessLock(path: string): Promise<boolean> {
+  try {
+    const value = (await readFile(path, 'utf8')).trim();
+    if (!/^\d+$/.test(value)) return false;
+    const pid = Number(value);
+    if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return false;
+    try {
+      process.kill(pid, 0);
+      return false;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'ESRCH';
+    }
+  } catch {
+    return false;
+  }
+}
 const callSchema = z.object({ id: z.string(), name: z.string(), arguments: z.string() });
 const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant', 'tool']),
@@ -174,16 +191,27 @@ export class SessionStore {
   async lock(id: string, suffix = '.lock'): Promise<() => Promise<void>> {
     await privateDirectory(this.directory);
     const path = this.path(id) + suffix;
-    let file;
-    try {
-      file = await open(path, 'wx', 0o600);
-      await file.writeFile(String(process.pid));
-    } catch {
-      throw new AirforceError(
-        `Session is locked. If no Airforce process is using it, remove ${path}.`,
-        'SESSION_LOCK',
-      );
+    let file: Awaited<ReturnType<typeof open>> | undefined;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        file = await open(path, 'wx', 0o600);
+        await file.writeFile(String(process.pid));
+        break;
+      } catch (error) {
+        const exists = (error as NodeJS.ErrnoException).code === 'EEXIST';
+        if (attempt === 0 && exists && (await staleProcessLock(path))) {
+          await rm(path, { force: true });
+          continue;
+        }
+        throw new AirforceError(
+          exists
+            ? `Session is locked by another Airforce process (${path}).`
+            : `Cannot create session lock ${path}: ${error instanceof Error ? error.message : String(error)}`,
+          'SESSION_LOCK',
+        );
+      }
     }
+    if (!file) throw new AirforceError('Cannot acquire session lock', 'SESSION_LOCK');
     return async () => {
       await file.close();
       await rm(path, { force: true });

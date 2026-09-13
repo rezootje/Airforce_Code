@@ -43,6 +43,9 @@ it('persists, locks, forks and validates sessions without leaking keys', async (
     const release = await store.lock(session.id);
     await expect(store.lock(session.id)).rejects.toThrow('locked');
     await release();
+    await writeFile(join(store.directory, session.id + '.lock'), '99999999');
+    const recovered = await store.lock(session.id);
+    await recovered();
     await expect(store.load('../bad')).rejects.toThrow('UUID');
     if (process.platform !== 'win32')
       expect((await stat(join(w.home, 'sessions', session.id + '.json'))).mode & 0o077).toBe(0);

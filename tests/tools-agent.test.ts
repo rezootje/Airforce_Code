@@ -65,6 +65,8 @@ it('completes a multi-step inspect, patch, verify loop and persists tool results
     expect(await readFile(join(w.root, 'hello.ts'), 'utf8')).toContain('value = 2');
     expect((await r.store.load(s.id)).edits).toHaveLength(1);
     expect(events.some((e) => e.type === 'file.changed')).toBe(true);
+    expect(events).toContainEqual({ type: 'agent.progress', message: 'Preparing context' });
+    expect(events).toContainEqual({ type: 'agent.progress', message: 'Running 1 tool' });
     expect(s.usage).toEqual({
       inputTokens: 120,
       outputTokens: 30,

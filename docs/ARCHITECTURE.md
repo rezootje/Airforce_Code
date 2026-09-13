@@ -63,7 +63,7 @@ Each user request:
 
 Sequential mutation is intentional. The core has a steering queue that incorporates new user instructions at the next model boundary. The initial terminal UI supports cancellation and follow-up prompts but does not yet accept live typed steering while a request is running.
 
-Typed events drive both interfaces. The engine does not import terminal libraries. No hidden chain-of-thought event is emitted. Completion status means the loop returned; engineering success must still be evaluated from tool/verification results and the final response.
+Typed events drive both interfaces. The engine does not import terminal libraries. Phase events report operational state without exposing hidden chain-of-thought, and command output is streamed through redaction before display. Completion status means the loop returned; engineering success must still be evaluated from tool/verification results and the final response.
 
 ## Permissions and subprocesses
 

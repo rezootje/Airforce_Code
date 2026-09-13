@@ -171,7 +171,7 @@ export class MarkdownStream {
     const complete = this.source.slice(0, boundary);
     this.source = this.source.slice(boundary);
     const rendered = renderMarkdown(complete, this.theme, this.options);
-    return rendered ? `${rendered}\n\n` : '';
+    return rendered ? `${rendered}\n` : '';
   }
 
   flush(): string {
@@ -198,8 +198,13 @@ export class MarkdownStream {
           inFence = undefined;
           boundary = offset;
         }
-      } else if (!inFence && line.trim() === '') {
-        boundary = offset;
+      } else if (!inFence) {
+        const trimmed = line.trim();
+        // Pipe tables need their header, delimiter and rows parsed together.
+        // Other complete lines are safe to render immediately, so a response
+        // remains visibly streaming even when the model emits no blank lines.
+        if (trimmed === '') boundary = offset;
+        else if (!/^\|.*\|$/u.test(trimmed)) boundary = offset;
       }
     }
     return boundary;

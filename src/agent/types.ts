@@ -29,6 +29,7 @@ export interface Model {
 export type ProviderEvent =
   | { type: 'text'; text: string }
   | { type: 'tool'; call: ToolCall }
+  | { type: 'status'; message: string }
   | { type: 'usage'; input: number; output: number; costUsd?: number };
 export interface Provider {
   models(signal?: AbortSignal): Promise<Model[]>;
@@ -53,6 +54,7 @@ export interface Action {
 export type Approval = (action: Action) => Promise<boolean>;
 export type AgentEvent =
   | { type: 'agent.started'; sessionId: string }
+  | { type: 'agent.progress'; message: string }
   | { type: 'assistant.delta'; text: string }
   | { type: 'assistant.message'; text: string }
   | { type: 'tool.started'; id: string; name: string; description: string }

@@ -372,7 +372,8 @@ async function main(): Promise<void> {
     throw new AirforceError('Set --model, AIRFORCE_MODEL, or run airforce setup.', 'CONFIG', 2);
   if (!flags.prompt && !tty)
     throw new AirforceError('Non-interactive mode requires --prompt.', 'USAGE', 2);
-  const models = await provider.models();
+  output.working('Loading models');
+  const models = await provider.models().finally(() => output.idle());
   const selected = models.find((m) => m.id === config.model);
   if (!selected)
     throw new AirforceError(

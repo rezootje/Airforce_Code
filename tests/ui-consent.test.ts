@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { slashCommands } from '../src/cli/commands.js';
 import { DirectoryConsentStore } from '../src/security/directory-consent.js';
 import { logo } from '../src/ui/brand.js';
@@ -13,6 +13,7 @@ import { MarkdownStream, renderMarkdown } from '../src/ui/markdown.js';
 import { renderStatus } from '../src/ui/status.js';
 import { configSchema } from '../src/config/config.js';
 import { newSession } from '../src/sessions/store.js';
+import { Output } from '../src/ui/output.js';
 import { workspace } from './helpers.js';
 
 describe('interactive discovery', () => {
@@ -97,6 +98,21 @@ describe('interactive discovery', () => {
     expect(stream.push('```ts\nconst')).toBe('');
     expect(stream.push(' value = 1;\n```\n')).toContain('const value = 1;');
     expect(stream.flush()).toBe('');
+  });
+
+  it('renders ordinary completed lines immediately while streaming', () => {
+    const stream = new MarkdownStream(createTheme(false), { color: false });
+    expect(stream.push('Inspecting the repository\n')).toContain('Inspecting the repository');
+  });
+
+  it('shows live command output instead of silently capturing it', () => {
+    const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const output = new Output({ color: false });
+    output.event({ type: 'agent.started', sessionId: 'test' });
+    output.event({ type: 'tool.output', stream: 'stdout', text: 'tests running\n' });
+    output.event({ type: 'agent.completed', status: 'completed', text: '' });
+    expect(write.mock.calls.map(([value]) => String(value)).join('')).toContain('tests running');
+    write.mockRestore();
   });
 
   it('renders status as a readable dashboard with Git and context summaries', () => {

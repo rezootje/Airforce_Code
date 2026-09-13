@@ -2,6 +2,12 @@
 
 All user-visible changes are documented here. Versions follow Semantic Versioning.
 
+## [1.1.2] - 2026-09-13
+
+- Show request phases, streamed command output and assistant Markdown lines as work happens.
+- Detect stalled API response streams and report stable `STREAM_TIMEOUT` or `API_TIMEOUT` errors.
+- Recover session locks left behind by terminated Airforce processes while preserving live-process locks.
+
 ## [0.1.1] - 2026-09-13
 
 Release candidate.

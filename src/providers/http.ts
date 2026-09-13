@@ -1,5 +1,43 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { AirforceError } from '../utils/errors.js';
+
+function abortFailure(signal?: AbortSignal): unknown {
+  if (!signal?.aborted) return undefined;
+  if ((signal.reason as { name?: string } | undefined)?.name === 'TimeoutError')
+    return new AirforceError(
+      'API request timed out. Retry the request or run airforce doctor.',
+      'API_TIMEOUT',
+    );
+  return signal.reason;
+}
+
+async function readChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  idleTimeoutMs: number,
+  signal?: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      reader.read().catch((error) => Promise.reject(abortFailure(signal) ?? error)),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new AirforceError(
+                `API stream produced no data for ${Math.round(idleTimeoutMs / 1000)} seconds. Retry or press Escape to cancel.`,
+                'STREAM_TIMEOUT',
+              ),
+            ),
+          idleTimeoutMs,
+        );
+        timer.unref();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 export function endpoint(base: string, path: string): string {
   return `${base.replace(/\/$/, '').replace(/\/v1$/, '')}/v1/${path}`;
 }
@@ -9,12 +47,14 @@ export async function request(
   signal: AbortSignal,
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
-    signal.throwIfAborted();
+    const abortedBeforeRequest = abortFailure(signal);
+    if (abortedBeforeRequest) throw abortedBeforeRequest;
     let response: Response;
     try {
       response = await fetch(url, { ...init, redirect: 'error', signal });
     } catch (e) {
-      signal.throwIfAborted();
+      const aborted = abortFailure(signal);
+      if (aborted) throw aborted;
       throw new AirforceError(
         `Cannot reach API. Check base URL, TLS and connectivity. ${e instanceof Error ? e.message : ''}`,
         'NETWORK',
@@ -43,7 +83,12 @@ export async function request(
     throw new AirforceError(`API HTTP ${status}. ${help}`, `HTTP_${status}`);
   }
 }
-export async function boundedText(response: Response, max = 4_000_000): Promise<string> {
+export async function boundedText(
+  response: Response,
+  max = 4_000_000,
+  idleTimeoutMs = 30000,
+  signal?: AbortSignal,
+): Promise<string> {
   if (!response.body) return '';
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -51,7 +96,7 @@ export async function boundedText(response: Response, max = 4_000_000): Promise<
   let bytes = 0;
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      const { value, done } = await readChunk(reader, idleTimeoutMs, signal);
       if (done) break;
       bytes += value.length;
       if (bytes > max) throw new AirforceError('API response exceeds size limit', 'RESPONSE_LIMIT');
@@ -63,7 +108,10 @@ export async function boundedText(response: Response, max = 4_000_000): Promise<
     reader.releaseLock();
   }
 }
-export async function* sse(response: Response): AsyncGenerator<unknown> {
+export async function* sse(
+  response: Response,
+  options: { idleTimeoutMs?: number; signal?: AbortSignal } = {},
+): AsyncGenerator<unknown> {
   if (!response.body) throw new AirforceError('API returned no response body', 'PROTOCOL');
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -82,7 +130,11 @@ export async function* sse(response: Response): AsyncGenerator<unknown> {
   }
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      const { value, done } = await readChunk(
+        reader,
+        options.idleTimeoutMs ?? 60000,
+        options.signal,
+      );
       if (done) {
         buffer += decoder.decode();
         break;

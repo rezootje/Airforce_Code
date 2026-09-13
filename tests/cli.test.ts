@@ -1,7 +1,7 @@
 import { it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { workspace } from './helpers.js';
 import { configSchema, FileAuthStore, saveConfig } from '../src/config/config.js';
@@ -206,6 +206,9 @@ it.skipIf(process.platform !== 'linux')(
   async () => {
     const w = await workspace();
     try {
+      // Keep this synthetic project isolated even when the host temp directory
+      // happens to sit inside an unrelated Git worktree.
+      await mkdir(join(w.root, '.git'));
       const config = configSchema.parse({
         onboardingComplete: true,
         baseUrl: url,
