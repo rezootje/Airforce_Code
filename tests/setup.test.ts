@@ -23,7 +23,10 @@ it('validates credentials, discovers models, offers OAuth and persists key separ
     vi.spyOn(process.stderr, 'write').mockReturnValue(true);
     prompts.input.mockResolvedValue('https://configured.test');
     prompts.password.mockResolvedValue('setup-private-key');
-    prompts.select.mockResolvedValueOnce('api-key').mockResolvedValueOnce('edit');
+    prompts.select
+      .mockResolvedValueOnce('custom')
+      .mockResolvedValueOnce('api-key')
+      .mockResolvedValueOnce('edit');
     prompts.search.mockResolvedValue('new-model');
     prompts.confirm.mockResolvedValue(true);
     vi.stubGlobal(
@@ -33,8 +36,8 @@ it('validates credentials, discovers models, offers OAuth and persists key separ
     const result = await setup(configSchema.parse({}), w.home);
     expect(result.config.model).toBe('new-model');
     expect(result.config.onboardingComplete).toBe(true);
-    expect(prompts.select.mock.calls[0]?.[0].choices[1].value).toBe('oauth');
-    expect(prompts.select.mock.calls[0]?.[0].choices[1].disabled).toBeUndefined();
+    expect(prompts.select.mock.calls[1]?.[0].choices[1].value).toBe('oauth');
+    expect(prompts.select.mock.calls[1]?.[0].choices[1].disabled).toBe(true);
     expect(await readFile(join(w.home, 'config.json'), 'utf8')).not.toContain('setup-private-key');
     expect(await readFile(join(w.home, 'credentials.json'), 'utf8')).toContain('setup-private-key');
   } finally {
@@ -54,6 +57,7 @@ it('validates a replacement API key before overwriting saved credentials', async
     const { FileAuthStore } = await import('../src/config/config.js');
     const auth = new FileAuthStore(w.home);
     await auth.save({ kind: 'api-key', apiKey: 'old-private-key' });
+    prompts.select.mockResolvedValueOnce('custom');
     prompts.input.mockResolvedValue('https://configured.test');
     prompts.password.mockResolvedValueOnce('invalid-private-key');
     vi.stubGlobal(
@@ -63,6 +67,7 @@ it('validates a replacement API key before overwriting saved credentials', async
     await expect(updateAuthentication(config, w.home, { method: 'api-key' })).rejects.toThrow();
     expect(await auth.load()).toEqual({ kind: 'api-key', apiKey: 'old-private-key' });
 
+    prompts.select.mockResolvedValueOnce('custom');
     prompts.password.mockResolvedValueOnce('new-private-key');
     vi.stubGlobal(
       'fetch',

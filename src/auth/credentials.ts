@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AirforceError } from '../utils/errors.js';
+import { AIRFORCE_API_URL } from './constants.js';
 export const credentialsSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('api-key'), apiKey: z.string().min(1) }).strict(),
   z
@@ -21,6 +22,12 @@ export function credentialToken(credentials: Credentials): string {
 }
 export function assertCredentials(credentials: Credentials, baseUrl: string): void {
   if (credentials.kind === 'oauth') {
+    if (new URL(baseUrl).origin !== new URL(AIRFORCE_API_URL).origin)
+      throw new AirforceError(
+        'OAuth is available only with the default api.airforce service. The configured endpoint is a different API origin; use an API key for a custom endpoint.',
+        'AUTH_ENDPOINT',
+        2,
+      );
     if (credentials.expiresAt <= Date.now() + 30000)
       throw new AirforceError(
         'OAuth session expired. Run airforce login to sign in again.',

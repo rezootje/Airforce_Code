@@ -39,10 +39,13 @@ def send(value):
     time.sleep(0.08)
 
 try:
+    wait_for('API service')
+    wait_for('Custom endpoint')
+    send('\r')
+    wait_for('Custom API base URL')
+    send(os.environ['AIRFORCE_BASE_URL'] + '\r')
     wait_for('Authentication')
     send('\r')
-    wait_for('API base URL')
-    send(os.environ['AIRFORCE_BASE_URL'] + '\r')
     wait_for('API key')
     send('synthetic-pty-key\r')
     wait_for('Select a model')

@@ -13,17 +13,61 @@ import { createTheme } from './theme.js';
 import { formatModelPricing } from '../models/pricing.js';
 export type AuthMethod = 'api-key' | 'oauth';
 
-async function chooseAuthentication(method?: AuthMethod): Promise<AuthMethod> {
+async function chooseAuthentication(method?: AuthMethod, allowOAuth = true): Promise<AuthMethod> {
+  if (method === 'oauth' && !allowOAuth)
+    throw new Error('OAuth is available only with the default api.airforce service.');
   return (
     method ??
     (await select({
       message: 'Authentication',
       choices: [
         { name: 'API Key', value: 'api-key' as const },
-        { name: 'Sign in with Airforce — OAuth', value: 'oauth' as const },
+        ...(allowOAuth
+          ? [{ name: 'Sign in with Airforce — OAuth', value: 'oauth' as const }]
+          : [
+              {
+                name: 'OAuth — only available with api.airforce',
+                value: 'oauth' as const,
+                disabled: true,
+              },
+            ]),
       ],
     }))
   );
+}
+
+async function chooseEndpoint(config: Config): Promise<boolean> {
+  const defaultOrigin = new URL(AIRFORCE_API_URL).origin;
+  const currentIsDefault = new URL(config.baseUrl ?? AIRFORCE_API_URL).origin === defaultOrigin;
+  const choice = await select({
+    message: 'API service',
+    choices: [
+      {
+        name: 'Default · api.airforce',
+        value: 'default' as const,
+        description: currentIsDefault ? 'Recommended · API key or OAuth' : undefined,
+      },
+      {
+        name: 'Custom endpoint · API key only',
+        value: 'custom' as const,
+        description: 'For compatible OpenAI or Anthropic API deployments',
+      },
+    ],
+    default: currentIsDefault ? 'default' : 'custom',
+  });
+  if (choice === 'default') {
+    config.baseUrl = AIRFORCE_API_URL;
+    config.oauthIssuer = AIRFORCE_API_URL;
+    return true;
+  }
+  config.baseUrl = await input({
+    message: 'Custom API base URL (HTTPS; /v1 suffix optional)',
+    default: currentIsDefault ? '' : config.baseUrl,
+    validate: (value) =>
+      endpointSchema.safeParse(value).success ||
+      'Enter a valid HTTPS URL (HTTP allowed for localhost tests).',
+  });
+  return false;
 }
 
 async function enterCredentials(
@@ -126,16 +170,10 @@ export async function setup(
       theme,
     )}\n\n`,
   );
-  process.stderr.write(`${theme.muted('[1/4] Account')}\n`);
-  const method = await chooseAuthentication(options.method);
-  process.stderr.write(`\n${theme.muted('[2/4] API endpoint')}\n`);
-  config.baseUrl = await input({
-    message: 'API base URL (HTTPS; /v1 suffix optional)',
-    default: config.baseUrl ?? AIRFORCE_API_URL,
-    validate: (value) =>
-      endpointSchema.safeParse(value).success ||
-      'Enter a valid HTTPS URL (HTTP allowed for localhost tests).',
-  });
+  process.stderr.write(`${theme.muted('[1/4] API service')}\n`);
+  const defaultService = await chooseEndpoint(config);
+  process.stderr.write(`\n${theme.muted('[2/4] Account')}\n`);
+  const method = await chooseAuthentication(options.method, defaultService);
   const credentials = await enterCredentials(config, method, options.browser);
   const provider = new AirforceProvider(config, credentials);
   const models = await provider.models();
@@ -209,14 +247,8 @@ export async function updateAuthentication(
       theme,
     )}\n\n`,
   );
-  const method = await chooseAuthentication(options.method);
-  config.baseUrl = await input({
-    message: 'API base URL',
-    default: config.baseUrl ?? AIRFORCE_API_URL,
-    validate: (value) =>
-      endpointSchema.safeParse(value).success ||
-      'Enter a valid HTTPS URL (HTTP allowed for localhost tests).',
-  });
+  const defaultService = await chooseEndpoint(config);
+  const method = await chooseAuthentication(options.method, defaultService);
   const credentials = await enterCredentials(config, method, options.browser);
   const provider = new AirforceProvider(config, credentials);
   const models = await provider.models();

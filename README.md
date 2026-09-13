@@ -48,7 +48,7 @@ Running `airforce` for the first time opens a guided setup. It connects an API k
 
 Onboarding offers API-key authentication and **Sign in with Airforce — OAuth**. OAuth uses the system browser, Authorization Code with PKCE S256, a state-protected callback at `http://localhost:43821/oauth/callback`, profile validation, and Bearer tokens. No client secret ships in the NPM package.
 
-The default API origin is `https://api.airforce`, defined once in `src/auth/constants.ts`. A base URL can include `/v1`; endpoint construction avoids duplicating it. Custom endpoints remain configurable. HTTPS is required except for loopback test endpoints. Redirects are rejected so credentials are not forwarded to another origin.
+The default API origin is `https://api.airforce`, defined once in `src/auth/constants.ts`. Setup offers the default service or a custom compatible endpoint. Custom endpoints support API keys only; OAuth is restricted to the default api.airforce service. A base URL can include `/v1`; endpoint construction avoids duplicating it. HTTPS is required except for loopback test endpoints. Redirects are rejected so credentials are not forwarded to another origin.
 
 ```sh
 airforce auth                 # choose API key or OAuth
