@@ -2,6 +2,12 @@
 
 All user-visible changes are documented here. Versions follow Semantic Versioning.
 
+## [1.1.3] - 2026-09-13
+
+- Keep completed first-run onboarding completed across launches; missing or expired credentials now open the focused authentication flow instead of restarting setup.
+- Let interactive launches recover a missing model through the model picker without repeating onboarding.
+- Make temporary-workspace tests compare canonical paths on macOS and Windows so the full CI matrix validates the same security behavior.
+
 ## [1.1.2] - 2026-09-13
 
 - Show request phases, streamed command output and assistant Markdown lines as work happens.

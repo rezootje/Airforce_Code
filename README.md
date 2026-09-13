@@ -24,7 +24,7 @@ The NPM package is `airforce-code`. Installation provides both `airforce` and `a
 airforce setup
 ```
 
-Running `airforce` for the first time opens a guided setup. It connects an API key or OAuth account, validates the endpoint, loads models, provides a searchable model picker, and selects a default safety mode. Completion is remembered globally, so later launches go straight to the project consent screen or workspace. Run `airforce setup` whenever you want to repeat the flow.
+Running `airforce` for the first time opens a guided setup. It connects an API key or OAuth account, validates the endpoint, loads models, provides a searchable model picker, and selects a default safety mode. Completion is remembered globally, so later launches go straight to the project consent screen or workspace. If credentials are missing or OAuth has expired, later launches open the focused authentication screen and retain the existing model and safety settings. Run `airforce setup` whenever you want to repeat the complete flow.
 
 Onboarding offers API-key authentication and **Sign in with Airforce — OAuth**. OAuth uses the system browser, Authorization Code with PKCE S256, a state-protected callback at `http://localhost:43821/oauth/callback`, profile validation, and Bearer tokens. No client secret ships in the NPM package.
 

@@ -19,7 +19,7 @@ import { SessionStore, newSession } from '../sessions/store.js';
 import { Redactor, sanitize } from '../security/redact.js';
 import { AirforceError, errorCode, errorMessage } from '../utils/errors.js';
 import { projectRoot } from '../context/repository.js';
-import { setup, updateAuthentication, type AuthMethod } from '../ui/setup.js';
+import { pickModel, setup, updateAuthentication, type AuthMethod } from '../ui/setup.js';
 import { interactive } from '../ui/interactive.js';
 import { Output } from '../ui/output.js';
 import { AirforceMediaProvider } from '../providers/media.js';
@@ -31,6 +31,7 @@ import { DirectoryConsentStore } from '../security/directory-consent.js';
 import { requestDirectoryConsent } from '../ui/directory-consent.js';
 import { captureEscape } from '../ui/interrupt.js';
 import { pickSession } from '../ui/session-picker.js';
+import { startupAction } from './startup.js';
 interface Options {
   prompt?: string;
   model?: string;
@@ -286,16 +287,14 @@ async function main(): Promise<void> {
     await performAuthentication(operation as AuthMethod | undefined);
     return;
   }
-  if (
-    command === 'setup' ||
-    (!flags.prompt &&
-      tty &&
-      (!config.onboardingComplete ||
-        !apiKey ||
-        !config.baseUrl ||
-        !config.model ||
-        (credentials?.kind === 'oauth' && credentials.expiresAt <= Date.now() + 30000)))
-  ) {
+  const startup = startupAction({
+    explicitSetup: command === 'setup',
+    interactive: tty,
+    hasPrompt: !!flags.prompt,
+    config,
+    credentials,
+  });
+  if (startup === 'setup') {
     if (!tty)
       throw new AirforceError(
         'Setup requires an interactive terminal. Set AIRFORCE_API_KEY, AIRFORCE_BASE_URL and AIRFORCE_MODEL for CI.',
@@ -312,6 +311,9 @@ async function main(): Promise<void> {
     redactor = new Redactor([apiKey]);
     output.redactor = redactor;
     if (command === 'setup') return;
+  }
+  if (startup === 'authenticate') {
+    await performAuthentication(credentials?.kind === 'oauth' ? 'oauth' : undefined);
   }
   if (command && !['models', 'doctor'].includes(command))
     throw new AirforceError(`Unknown command: ${command}`, 'USAGE', 2);
@@ -368,12 +370,20 @@ async function main(): Promise<void> {
     output.print(await provider.models());
     return;
   }
-  if (!config.model)
-    throw new AirforceError('Set --model, AIRFORCE_MODEL, or run airforce setup.', 'CONFIG', 2);
   if (!flags.prompt && !tty)
     throw new AirforceError('Non-interactive mode requires --prompt.', 'USAGE', 2);
   output.working('Loading models');
   const models = await provider.models().finally(() => output.idle());
+  if (!config.model) {
+    if (!interactiveLaunch)
+      throw new AirforceError('Set --model, AIRFORCE_MODEL, or run airforce setup.', 'CONFIG', 2);
+    config.model = (await pickModel(models, config)).id;
+    config.recentModels = [
+      config.model,
+      ...config.recentModels.filter((model) => model !== config.model),
+    ].slice(0, 10);
+    await saveConfig(home, config);
+  }
   const selected = models.find((m) => m.id === config.model);
   if (!selected)
     throw new AirforceError(

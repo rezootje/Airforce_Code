@@ -1,9 +1,9 @@
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Message, Provider, ProviderEvent, ToolDefinition } from '../src/agent/types.js';
 export async function workspace() {
-  const base = await mkdtemp(join(tmpdir(), 'airforce-test-'));
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'airforce-test-')));
   const root = join(base, 'project');
   const home = join(base, 'private');
   await mkdir(root);
