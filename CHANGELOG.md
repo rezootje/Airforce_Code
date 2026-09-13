@@ -2,6 +2,13 @@
 
 All user-visible changes are documented here. Versions follow Semantic Versioning.
 
+## [0.1.1] - 2026-09-13
+
+Release candidate.
+
+- Add explicit default api.airforce or custom endpoint setup, with OAuth restricted to the default service.
+- Complete terminal status dashboard and Markdown rendering improvements.
+
 ## [0.1.0] - 2026-09-13
 
 Initial, unpublished implementation.

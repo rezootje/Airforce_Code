@@ -4,8 +4,8 @@ A permission-aware coding agent for your terminal, powered by a configurable **a
 
 ## Install and run
 
-Requires Node.js 24 or newer. 
-**WARNING:** The application was originally tested on Linux (Fedora), we do NOT know if Windows and MacOS work just yet. 
+Requires Node.js 24 or newer.
+**WARNING:** The application was originally tested on Linux (Fedora), we do NOT know if Windows and MacOS work just yet.
 Please be aware of this when installing Airforce Code. We recommend WSL on Windows if it doesn't work.
 
 After publication under the selected package name:
@@ -15,7 +15,6 @@ npm install -g airforce-code
 # or
 npx airforce-code
 ```
-
 
 The NPM package is `airforce-code`. Installation provides both `airforce` and `airforce-code` executable names; documentation uses the shorter `airforce` command. The package name remains centralized in `package.json`, and package verification reads it dynamically.
 

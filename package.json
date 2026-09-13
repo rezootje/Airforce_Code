@@ -1,6 +1,6 @@
 {
   "name": "airforce-code",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A permission-aware coding agent for the api.airforce API",
   "type": "module",
   "license": "MIT",
