@@ -1,0 +1,63 @@
+{
+  "name": "airforce-code",
+  "version": "0.1.0",
+  "description": "A permission-aware coding agent for the api.airforce API",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "airforce": "dist/cli/main.js",
+    "airforce-code": "dist/cli/main.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "docs"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:api": "tsx scripts/test-api.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "prepack": "npm run build",
+    "test:package": "node scripts/test-package.mjs"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.7.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "cli-highlight": "^2.1.11",
+    "commander": "^15.0.0",
+    "cross-spawn": "^7.0.6",
+    "diff": "^9.0.0",
+    "ignore": "^7.0.9",
+    "marked": "^17.0.1",
+    "picocolors": "^1.1.1",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cross-spawn": "^6.0.6",
+    "@types/diff": "^7.0.2",
+    "@types/node": "^22.20.2",
+    "eslint": "^10.10.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.0"
+  }
+}
