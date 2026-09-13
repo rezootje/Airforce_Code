@@ -7,6 +7,7 @@ All user-visible changes are documented here. Versions follow Semantic Versionin
 - Show request phases, streamed command output and assistant Markdown lines as work happens.
 - Detect stalled API response streams and report stable `STREAM_TIMEOUT` or `API_TIMEOUT` errors.
 - Recover session locks left behind by terminated Airforce processes while preserving live-process locks.
+- Add repository metadata required for NPM trusted-publishing provenance verification.
 
 ## [0.1.1] - 2026-09-13
 

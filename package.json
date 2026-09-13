@@ -2,6 +2,14 @@
   "name": "airforce-code",
   "version": "1.1.2",
   "description": "A permission-aware coding agent for the api.airforce API",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rezootje/Airforce_Code.git"
+  },
+  "homepage": "https://github.com/rezootje/Airforce_Code#readme",
+  "bugs": {
+    "url": "https://github.com/rezootje/Airforce_Code/issues"
+  },
   "type": "module",
   "license": "MIT",
   "engines": {
