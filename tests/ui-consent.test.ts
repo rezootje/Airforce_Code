@@ -150,7 +150,8 @@ describe('directory consent', () => {
       await store.trust(w.root);
       expect(await store.isTrusted(w.root)).toBe(true);
       expect((await store.list())[0]?.root).toBe(w.root);
-      expect((await stat(`${w.home}/trusted-directories.json`)).mode & 0o777).toBe(0o600);
+      if (process.platform !== 'win32')
+        expect((await stat(`${w.home}/trusted-directories.json`)).mode & 0o777).toBe(0o600);
       expect(await store.revoke(w.root)).toBe(true);
       expect(await store.isTrusted(w.root)).toBe(false);
     } finally {
